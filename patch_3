@@ -1,0 +1,227 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Timers;
+
+namespace HangmanAppTest
+{
+    internal class Program
+    {
+        private static Timer gameTimer;  // Verwende System.Timers.Timer
+        private static int timeLeft;
+        private static bool timeUp;
+        private static int gamesWon = 0;
+        private static int gamesLost = 0;
+        private static bool hintsEnabled = false;
+
+        private static void PrintHangman(int wrong)
+        {
+            string[] stages = {
+                "\n+---+\n    |\n    |\n    |\n   ===",
+                "\n+---+\nO   |\n    |\n    |\n   ===",
+                "\n+---+\nO   |\n|   |\n    |\n   ===",
+                "\n+---+\n O  |\n/|  |\n    |\n   ===",
+                "\n+---+\n O  |\n/|\\ |\n    |\n   ===",
+                "\n+---+\n O  |\n/|\\ |\n/   |\n   ===",
+                "\n+---+\n O  |\n/|\\ |\n/ \\ |\n   ==="
+            };
+            Console.WriteLine(stages[Math.Min(wrong, stages.Length - 1)]);
+        }
+
+        private static int PrintWord(List<char> guessedLetters, string randomWord)
+        {
+            int correctLetters = 0;
+            Console.Write("\nWort: ");
+            foreach (char c in randomWord)
+            {
+                if (guessedLetters.Contains(c))
+                {
+                    Console.Write(c + " ");
+                    correctLetters++;
+                }
+                else
+                {
+                    Console.Write("_ ");
+                }
+            }
+            Console.WriteLine();
+            return correctLetters;
+        }
+
+        private static void StartTimer(int duration)
+        {
+            timeLeft = duration;
+            timeUp = false;
+            gameTimer = new Timer(1000);
+            gameTimer.Elapsed += (sender, e) =>
+            {
+                if (timeLeft > 0)
+                {
+                    timeLeft--;
+                }
+                else
+                {
+                    timeUp = true;
+                    gameTimer.Stop();
+                    Console.WriteLine("\n⏳ Zeit ist abgelaufen!");
+                }
+            };
+            gameTimer.Start();
+        }
+
+        private static void DisplayHint(string randomWord, int wrongGuesses)
+        {
+            if (hintsEnabled)
+            {
+                // Tipp 1: Hinweis auf die Länge des Wortes
+                Console.WriteLine($"Hinweis: Das Wort hat {randomWord.Length} Buchstaben.");
+
+                // Tipp 2: Hinweis auf die Anzahl der noch fehlenden Buchstaben
+                int missingLetters = randomWord.Length - wrongGuesses;
+                Console.WriteLine($"Hinweis: Es fehlen noch {missingLetters} Buchstaben.");
+
+                // Tipp 3: Vorschlag zu einem Buchstaben (z.B. häufige Buchstaben im Deutschen)
+                if (wrongGuesses <= 2)
+                {
+                    Console.WriteLine("Tipp: Versuche es mit einem häufigen Buchstaben wie 'e' oder 'n'.");
+                }
+            }
+        }
+
+        static void Main()
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.WriteLine("Willkommen bei Hangman!");
+            Console.WriteLine("-----------------------------------------");
+
+            do
+            {
+                Console.WriteLine("Wähle eine Option: \n1 - Play \n2 - Komplexität");
+                string choice = Console.ReadLine()?.Trim();
+                while (choice != "1" && choice != "2")
+                {
+                    Console.WriteLine("Ungültige Auswahl. Wähle 1 für Play oder 2 für Komplexität.");
+                    choice = Console.ReadLine()?.Trim();
+                }
+
+                string difficultyChoice = "";
+                if (choice == "2")
+                {
+                    Console.WriteLine("Wähle die Schwierigkeit: \n1 - Easy (kein Timer, keine Hinweise) \n2 - Normal (3 Minuten) \n3 - Hard (1 Minute)");
+                    difficultyChoice = Console.ReadLine()?.Trim();
+                    while (difficultyChoice != "1" && difficultyChoice != "2" && difficultyChoice != "3")
+                    {
+                        Console.WriteLine("Ungültige Auswahl. Wähle 1, 2 oder 3.");
+                        difficultyChoice = Console.ReadLine()?.Trim();
+                    }
+
+                    if (difficultyChoice == "1")
+                    {
+                        hintsEnabled = false;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Möchtest du Hinweise aktivieren? (ja/nein)");
+                        string hintChoice = Console.ReadLine()?.Trim().ToLower();
+                        hintsEnabled = hintChoice == "ja";
+                    }
+                }
+
+                Dictionary<string, string[]> categories = new Dictionary<string, string[]>
+                {
+                    { "1", new string[] { "tiger", "giraffe", "delfin", "elefant", "pinguin","wolf", "bär", "zebra", "giraffe", "schildkröte", "känguru", "leoparden", "adler", "papagei", "drache" } },
+                    { "2", new string[] { "basketball", "tennis", "volleyball", "fußball", "schwimmen",  "tennis",  "handball", "rugby", "golf", "eishockey", "gymnastik", "klettern", "reiten", "skateboarding" } },
+                    { "3", new string[] { "pizza", "banane", "schokolade", "käse", "brot" , "hamburger", "kekse", "sushi", "lasagne", "salat", "käse", "pommes", "spaghetti", "donuts", "kuchen" } },
+                    { "4", new string[] { "deutschland", "frankreich", "italien", "spanien", "österreich" , "kanada", "brasilien", "indien", "australien", "norwegen", "schottland", "usa", "japan"} },
+                    { "5", new string[] { "auto", "flugzeug", "schiff", "fahrrad", "zug",  "motorrad", "bus", "schiff", "roller", "fahrrad", "u-bahn", "tram", "jeep", "limousine", "truck"} },
+                    { "6", new string[] { "gitarre", "klavier", "schlagzeug", "geige", "trompete",  "trompete", "violine", "saxophon", "flöte", "trommel", "cello", "keyboard", "harfe", "akkordeon", "marimba" } }
+                };
+
+                Console.WriteLine("Wähle eine Kategorie: \n1 - Tiere \n2 - Sport \n3 - Essen \n4 - Länder \n5 - Fahrzeuge \n6 - Musikinstrumente");
+                string category = Console.ReadLine()?.Trim();
+                while (!categories.ContainsKey(category))
+                {
+                    Console.WriteLine("Ungültige Kategorie. Wähle 1, 2, 3, 4, 5 oder 6.");
+                    category = Console.ReadLine()?.Trim();
+                }
+
+                string[] wordList = categories[category];
+                Random random = new Random();
+                string randomWord = wordList[random.Next(wordList.Length)];
+
+                int wrongGuesses = 0;
+                List<char> guessedLetters = new List<char>();
+                int correctLetters = 0;
+
+                int timerDuration = (difficultyChoice == "2") ? 180 : (difficultyChoice == "3") ? 60 : 0;
+                if (timerDuration > 0) StartTimer(timerDuration);
+
+                while (wrongGuesses < 6 && correctLetters < randomWord.Length && !timeUp)
+                {
+                    // Zeige nur den Timer, wenn er aktiv ist
+                    if (timerDuration > 0)
+                    {
+                        Console.WriteLine($"\n⏳ Verbleibende Zeit: {timeLeft} Sekunden");
+                    }
+
+                    PrintHangman(wrongGuesses);
+                    correctLetters = PrintWord(guessedLetters, randomWord);
+
+                    DisplayHint(randomWord, wrongGuesses);
+
+                    Console.Write("\nRate einen Buchstaben: ");
+                    string input = Console.ReadLine()?.ToLower();
+
+                    // Eingabe validieren
+                    if (string.IsNullOrEmpty(input) || input.Length != 1 || !char.IsLetter(input[0]))
+                    {
+                        Console.WriteLine("Ungültige Eingabe! Bitte gib einen einzelnen Buchstaben ein.");
+                        continue;
+                    }
+
+                    char letterGuessed = input[0];
+
+                    if (guessedLetters.Contains(letterGuessed))
+                    {
+                        Console.WriteLine("Diesen Buchstaben hast du schon geraten.");
+                        continue;
+                    }
+
+                    guessedLetters.Add(letterGuessed);
+
+                    if (randomWord.Contains(letterGuessed))
+                    {
+                        correctLetters = PrintWord(guessedLetters, randomWord);
+                    }
+                    else
+                    {
+                        wrongGuesses++;
+                    }
+                }
+
+                // Spielzeit stoppen
+                gameTimer?.Stop();
+                PrintHangman(wrongGuesses);
+
+                // Gewinner oder Verlierer anzeigen
+                if (correctLetters == randomWord.Length)
+                {
+                    Console.WriteLine("\n🎉 Glückwunsch! Du hast das Wort erraten!");
+                    gamesWon++;
+                }
+                else
+                {
+                    Console.WriteLine($"\n❌ Game Over! Das Wort war: {randomWord}");
+                    gamesLost++;
+                }
+
+                // Rekord anzeigen
+                Console.WriteLine($"\n🏆 Dein Rekord: {gamesWon} gewonnene Spiele, {gamesLost} verlorene Spiele");
+                Console.WriteLine("Möchtest du noch eine Runde spielen? (ja/nein)");
+            }
+            while (Console.ReadLine().Trim().ToLower() == "ja");
+
+            Console.WriteLine("\nDanke fürs Spielen! 👋");
+        }
+    }
+}
