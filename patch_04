@@ -1,0 +1,194 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Timers;
+
+namespace HangmanApp
+{
+    internal class Program
+    {
+        private static Timer gameTimer;
+        private static int timeLeft;
+        private static bool timeUp;
+        private static int gamesWon = 0;
+        private static int gamesLost = 0;
+
+        private static void PrintHangman(int wrong)
+        {
+            string[] stages = {
+                "\n+---+\n    |\n    |\n    |\n   ===",
+                "\n+---+\nO   |\n    |\n    |\n   ===",
+                "\n+---+\nO   |\n|   |\n    |\n   ===",
+                "\n+---+\n O  |\n/|  |\n    |\n   ===",
+                "\n+---+\n O  |\n/|\\ |\n    |\n   ===",
+                "\n+---+\n O  |\n/|\\ |\n/   |\n   ===",
+                "\n+---+\n O  |\n/|\\ |\n/ \\ |\n   ==="
+            };
+            Console.WriteLine(stages[Math.Min(wrong, stages.Length - 1)]);
+        }
+
+        private static int PrintWord(List<char> guessedLetters, string randomWord)
+        {
+            int correctLetters = 0;
+            Console.Write("\nWort: ");
+            foreach (char c in randomWord)
+            {
+                if (guessedLetters.Contains(c))
+                {
+                    Console.Write(c + " ");
+                    correctLetters++;
+                }
+                else
+                {
+                    Console.Write("_ ");
+                }
+            }
+            Console.WriteLine();
+            return correctLetters;
+        }
+
+        private static void StartTimer(int duration)
+        {
+            timeLeft = duration;
+            timeUp = false;
+            gameTimer = new Timer(1000);
+            gameTimer.Elapsed += (sender, e) =>
+            {
+                if (timeLeft > 0)
+                {
+                    timeLeft--;
+                }
+                else
+                {
+                    timeUp = true;
+                    gameTimer.Stop();
+                    Console.WriteLine("\n⏳ Zeit ist abgelaufen!");
+                }
+            };
+            gameTimer.Start();
+        }
+
+        static void Main()
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.WriteLine("Willkommen bei Hangman!");
+            Console.WriteLine("-----------------------------------------");
+
+            do
+            {
+                Console.WriteLine("Wähle eine Option: \n1 - Play \n3 - Schwierigkeitsgrad");
+                string choice = Console.ReadLine()?.Trim();
+                while (choice != "1" && choice != "3")
+                {
+                    Console.WriteLine("Ungültige Auswahl. Wähle 1 für Play oder 3 für Schwierigkeitsgrad.");
+                    choice = Console.ReadLine()?.Trim();
+                }
+
+                string difficultyChoice = "1"; // Default Schwierigkeitsgrad
+
+                if (choice == "3")
+                {
+                    Console.WriteLine("Wähle den Schwierigkeitsgrad: \n1 - Einfach \n2 - Mittel \n3 - Schwer");
+                    difficultyChoice = Console.ReadLine()?.Trim();
+                }
+
+                Dictionary<string, (string[], string[])> categories = new Dictionary<string, (string[], string[])>
+                {
+                    { "1", (new string[] { "tiger", "giraffe", "delfin", "elefant", "pinguin", "wolf", "bär", "zebra", "löwe", "affe" },
+                             new string[] { "Ein großes Raubtier, das in Asien lebt.", "Ein langhalsiges Tier, das in Afrika lebt.", "Ein intelligentes Meerestier.", "Das größte Landtier der Welt.", "Ein flugunfähiger Vogel, der in kalten Regionen lebt.", "Ein wildes Tier aus der Familie der Hunde.", "Ein großes, kräftiges Landtier.", "Ein Tier mit schwarz-weißen Streifen.", "Ein königliches Raubtier.", "Ein verspieltes, kleineres Tier." }) },
+                    { "2", (new string[] { "basketball", "tennis", "volleyball", "fußball", "schwimmen", "handball", "rugby", "golf", "eishockey", "gymnastik" },
+                             new string[] { "Ein Sport, der mit einem runden Ball gespielt wird.", "Ein Sport, der mit einem Schläger und einem kleinen Ball gespielt wird.", "Ein Sport, bei dem zwei Teams den Ball über ein Netz schlagen.", "Der beliebteste Sport, bei dem der Ball mit den Füßen gespielt wird.", "Ein Sport, bei dem du dich im Wasser fortbewegst.", "Ein schneller Sport, bei dem der Ball mit der Hand geworfen wird.", "Ein Sport, bei dem der Ball getragen oder geworfen wird.", "Ein Sport, bei dem der Ball in ein Loch geschlagen wird.", "Ein schneller Sport auf Eis mit Schlägern.", "Ein Sport, bei dem Körperbeherrschung und Dehnungen gefragt sind." }) },
+                    { "3", (new string[] { "pizza", "banane", "schokolade", "käse", "brot", "hamburger", "kekse", "sushi", "lasagne", "salat" },
+                             new string[] { "Ein Gericht mit Teig, Tomatensauce und Käse.", "Eine gelbe Frucht, die reich an Kalium ist.", "Ein süßes Produkt aus Kakaobohnen.", "Ein Milchprodukt, das aus verschiedenen Milcharten hergestellt wird.", "Ein Grundnahrungsmittel, das aus Mehl und Wasser besteht.", "Ein Sandwich mit einem gegrillten Fleischpatty.", "Süße Backwaren, die häufig als Snack gegessen werden.", "Ein japanisches Gericht, das Reis und Fisch enthält.", "Ein italienisches Gericht mit Teig und Käse.", "Ein frisches grünes Gemüse." }) },
+                    { "4", (new string[] { "deutschland", "frankreich", "italien", "spanien", "österreich", "kanada", "brasilien", "indien", "australien", "norwegen" },
+                             new string[] { "Ein Land in Mitteleuropa, bekannt für Bier und Autos.", "Ein Land in Westeuropa, berühmt für Kunst und Kultur.", "Ein Land im Süden Europas, berühmt für Pasta.", "Ein Land im Südwesten Europas, bekannt für Fußball.", "Ein Land in Mitteleuropa, berühmt für Kaffee und Mozart.", "Ein Land in Nordamerika, bekannt für Ahornsirup.", "Ein großes Land in Südamerika, bekannt für den Amazonas.", "Ein Land in Südasien, berühmt für Bollywood.", "Ein Land im Südpazifik, berühmt für das Great Barrier Reef.", "Ein skandinavisches Land mit vielen Fjorden." }) },
+                    { "5", (new string[] { "auto", "flugzeug", "schiff", "fahrrad", "zug", "motorrad", "bus", "roller", "fahrrad", "limousine" },
+                             new string[] { "Ein Fortbewegungsmittel mit vier Rädern.", "Ein Luftfahrzeug, das Passagiere transportiert.", "Ein großes Fahrzeug, das auf Wasser fährt.", "Ein Fahrzeug mit zwei Rädern, das durch Pedale bewegt wird.", "Ein Fahrzeug, das auf Schienen fährt und Passagiere transportiert.", "Ein zweirädriges Fahrzeug, das mit einem Motor betrieben wird.", "Ein großes Fahrzeug, das viele Passagiere befördert.", "Ein kleines Fahrzeug mit zwei Rädern.", "Ein Fahrzeug mit zwei Rädern, das durch Pedale bewegt wird.", "Ein luxuriöses Auto." }) },
+                    { "6", (new string[] { "gitarre", "klavier", "schlagzeug", "geige", "trompete", "saxophon", "flöte", "trommel", "cello", "harfe" },
+                             new string[] { "Ein Saiteninstrument, das mit den Fingern oder einem Plektrum gespielt wird.", "Ein Musikinstrument mit Tasten und Saiten.", "Ein Schlaginstrument, das mit den Händen oder Stöcken gespielt wird.", "Ein Saiteninstrument, das mit einem Bogen gespielt wird.", "Ein Blechblasinstrument, das in der klassischen Musik verwendet wird.", "Ein Holzblasinstrument, das häufig im Jazz verwendet wird.", "Ein Holzblasinstrument, das durch Mundstückblasen gespielt wird.", "Ein Schlaginstrument, das mit den Händen oder Stöcken gespielt wird.", "Ein Saiteninstrument, das aus verschiedenen Holzarten gebaut ist.", "Ein Musikinstrument mit Saiten, das häufig in der klassischen Musik verwendet wird." }) }
+                };
+
+                Console.WriteLine("Wähle eine Kategorie: \n1 - Tiere \n2 - Sport \n3 - Essen \n4 - Länder \n5 - Fahrzeuge \n6 - Musikinstrumente");
+                string category = Console.ReadLine()?.Trim();
+                while (!categories.ContainsKey(category))
+                {
+                    Console.WriteLine("Ungültige Kategorie. Wähle 1, 2, 3, 4, 5 oder 6.");
+                    category = Console.ReadLine()?.Trim();
+                }
+
+                var (wordList, hints) = categories[category];
+                Random random = new Random();
+                string randomWord = wordList[random.Next(wordList.Length)];
+                string hint = hints[Array.IndexOf(wordList, randomWord)];
+
+                int wrongGuesses = 0;
+                List<char> guessedLetters = new List<char>();
+                int correctLetters = 0;
+
+                int timerDuration = (difficultyChoice == "2") ? 180 : (difficultyChoice == "3") ? 60 : 0;
+                if (timerDuration > 0) StartTimer(timerDuration);
+
+                while (wrongGuesses < 6 && correctLetters < randomWord.Length && !timeUp)
+                {
+                    Console.WriteLine($"\n⏳ Verbleibende Zeit: {timeLeft} Sekunden");
+                    PrintHangman(wrongGuesses);
+                    correctLetters = PrintWord(guessedLetters, randomWord);
+
+                    if (difficultyChoice == "1") 
+                    {
+                        Console.WriteLine($"\nHinweis: {hint}");
+                    }
+
+                    Console.Write("\nRate einen Buchstaben: ");
+                    string input = Console.ReadLine()?.ToLower();
+
+                    // Eingabe validieren
+                    if (string.IsNullOrEmpty(input) || input.Length != 1 || !char.IsLetter(input[0]))
+                    {
+                        Console.WriteLine("Ungültige Eingabe! Bitte gib einen einzelnen Buchstaben ein.");
+                        continue;
+                    }
+
+                    char letterGuessed = input[0];
+
+                    if (guessedLetters.Contains(letterGuessed))
+                    {
+                        Console.WriteLine("Diesen Buchstaben hast du schon geraten.");
+                        continue;
+                    }
+
+                    guessedLetters.Add(letterGuessed);
+
+                    if (randomWord.Contains(letterGuessed))
+                    {
+                        correctLetters = PrintWord(guessedLetters, randomWord);
+                    }
+                    else
+                    {
+                        wrongGuesses++;
+                    }
+                }
+
+                gameTimer?.Stop();
+                PrintHangman(wrongGuesses);
+
+                if (correctLetters == randomWord.Length)
+                {
+                    Console.WriteLine("\n🎉 Glückwunsch! Du hast das Wort erraten!");
+                    gamesWon++;
+                }
+                else
+                {
+                    Console.WriteLine($"\n❌ Game Over! Das Wort war: {randomWord}");
+                    gamesLost++;
+                }
+
+                Console.WriteLine($"\n🏆 Dein Rekord: {gamesWon} gewonnene Spiele, {gamesLost} verlorene Spiele");
+                Console.WriteLine("Möchtest du noch eine Runde spielen? (ja/nein)");
+            }
+            while (Console.ReadLine().Trim().ToLower() == "ja");
+
+            Console.WriteLine("\nDanke fürs Spielen! 👋");
+        }
+    }
+}
