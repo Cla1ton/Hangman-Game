@@ -1,0 +1,339 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Timers; // Для таймера
+using System.Threading; // Для затримки
+
+namespace HangmanSpiel
+{
+    class Program
+    {
+        private static int verbleibendeZeit;
+        private static bool zeitAbgelaufen;
+        private static int spieleGewonnen = 0;
+        private static int spieleVerloren = 0;
+        private static List<char> errateneBuchstaben = new List<char>();
+        private static int falscheVersuche;
+        private static string wort = "";
+        private static char[] wortAnzeigen;
+        private static bool hinweiseAktiviert;
+        private static string hinweis = "";
+        private static System.Threading.Timer timer;  // Використовуємо Timer з System.Timers
+        private static int timeLeft;
+
+        static void Main()
+        {
+            Console.WriteLine("Willkommen beim Hangman-Spiel!");
+
+            while (true)
+            {
+                SpielStarten();
+                Console.WriteLine("Möchtest du noch einmal spielen? (ja/nein)");
+                if (Console.ReadLine().ToLower() != "ja")
+                    break;
+            }
+        }
+
+        static void SpielStarten()
+        {
+            // Слова з описами для кожної категорії
+            Dictionary<string, List<(string Wort, string Hinweis)>> kategorien = new Dictionary<string, List<(string, string)>>
+            {
+                {"1", new List<(string, string)>{
+                    ("Schmetterling", "Ein farbenfrohes Insekt, das fliegen kann."),
+                    ("Katze", "Ein kleines, haariges Haustier, das oft miaut."),
+                    ("Hund", "Ein treuer Freund des Menschen, der bellt."),
+                    ("Elefant", "Ein großes Tier mit langen Rüsseln."),
+                    ("Tiger", "Ein gestreiftes Raubtier aus Asien."),
+                    ("Löwe", "Der König der Tiere, mit einer Mähne."),
+                    ("Pferd", "Ein großes Tier, das in vielen Kulturen als Fortbewegungsmittel dient."),
+                    ("Maus", "Ein kleines Nagetier, das in Häusern lebt."),
+                    ("Bär", "Ein großes Tier, das in Wäldern lebt."),
+                    ("Vogel", "Ein Tier, das fliegen kann."),
+                    ("Fisch", "Ein Lebewesen, das im Wasser lebt."),
+                    ("Ameise", "Ein kleines Insekt, das in großen Gruppen lebt."),
+                    ("Schaf", "Ein Tier, das Wolle produziert."),
+                    ("Hase", "Ein schnelles Tier, das oft in Wäldern lebt."),
+                    ("Känguru", "Ein Tier, das in Australien lebt und in die Luft hüpft.")
+                }},
+                {"2", new List<(string, string)>{
+                    ("Eiche", "Ein großer Baum, der lange lebt und Eicheln trägt."),
+                    ("Ahorn", "Ein Baum mit charakteristischen Blättern, aus dem Ahornsirup gewonnen wird."),
+                    ("Birke", "Ein Baum mit weißer Rinde."),
+                    ("Fichte", "Ein Nadelbaum, der in kühlen Klimazonen wächst."),
+                    ("Kiefer", "Ein Nadelbaum, der hohe, gerade Stämme hat."),
+                    ("Tanne", "Ein Nadelbaum mit weichen Nadeln und Zapfen."),
+                    ("Ulme", "Ein Baum, der oft an Flussufern wächst."),
+                    ("Esche", "Ein Baum mit gefiederten Blättern und starkem Holz."),
+                    ("Linde", "Ein Baum mit herzförmigen Blättern und duftenden Blüten."),
+                    ("Buche", "Ein Baum, der in mitteleuropäischen Wäldern wächst."),
+                    ("Platanen", "Ein Baum mit charakteristischer, schälender Rinde."),
+                    ("Mammutbaum", "Ein riesiger Baum, der in Kalifornien wächst."),
+                    ("Ginkgo", "Ein Baum mit fächerförmigen Blättern."),
+                    ("Weide", "Ein Baum, der oft an Flussufern wächst und biegsame Äste hat."),
+                    ("Kastanie", "Ein Baum, der große stachelige Früchte trägt.")
+                }},
+                {"3", new List<(string, string)>{
+                    ("Deutschland", "Ein Land in Mitteleuropa mit Berlin als Hauptstadt."),
+                    ("Frankreich", "Ein Land, bekannt für seinen Wein und das Pariser Wahrzeichen."),
+                    ("Spanien", "Ein Land auf der iberischen Halbinsel, berühmt für seine Strände."),
+                    ("Italien", "Ein Land, bekannt für seine Geschichte, Kunst und Pizza."),
+                    ("England", "Ein Teil des Vereinigten Königreichs, berühmt für seine Monarchie."),
+                    ("Schweden", "Ein skandinavisches Land, bekannt für seine Wikinger-Geschichte."),
+                    ("Niederlande", "Ein Land mit vielen Kanälen und Windmühlen."),
+                    ("Belgien", "Ein Land, bekannt für Schokolade und Bier."),
+                    ("Polen", "Ein Land in Mitteleuropa, bekannt für seine Geschichte."),
+                    ("Griechenland", "Ein Land, das für seine antike Geschichte und die Akropolis bekannt ist."),
+                    ("Portugal", "Ein Land im Südwesten Europas, bekannt für seine Strände."),
+                    ("Österreich", "Ein Land in Mitteleuropa, bekannt für seine Musik und Berge."),
+                    ("Schweiz", "Ein Land mit vielen Bergen und Schokolade."),
+                    ("Norwegen", "Ein Land in Skandinavien, bekannt für seine Fjorde."),
+                    ("Finnland", "Ein Land, das für seine Natur und die Saunen bekannt ist.")
+                }},
+                {"4", new List<(string, string)>{
+                    ("Apfel", "Eine Frucht, die in vielen Sorten existiert und von Bäumen wächst."),
+                    ("Banane", "Eine gelbe Frucht, die in tropischen Regionen wächst."),
+                    ("Kirsche", "Eine kleine, rote Frucht, die an Bäumen wächst."),
+                    ("Birne", "Eine Frucht mit einer breiten Basis und einem schmalen oberen Teil."),
+                    ("Traube", "Eine Frucht, die in Trauben wächst und für Wein verwendet wird."),
+                    ("Pflaume", "Eine kleine, runde Frucht, die süß oder sauer sein kann."),
+                    ("Orange", "Eine Zitrusfrucht mit einer dicken, orangen Schale."),
+                    ("Zitrone", "Eine gelbe, saure Frucht."),
+                    ("Melone", "Eine große, saftige Frucht mit einer dicken Schale."),
+                    ("Ananas", "Eine tropische Frucht mit einer rauen, stacheligen Schale."),
+                    ("Mango", "Eine tropische Frucht, die süß und saftig ist."),
+                    ("Papaya", "Eine tropische Frucht, die in grünen und reifen Zustand gegessen wird."),
+                    ("Erdbeere", "Eine süße, rote Frucht, die oft in Desserts verwendet wird."),
+                    ("Himbeere", "Eine kleine, rote Frucht mit vielen kleinen Samen."),
+                    ("Blaubeere", "Eine kleine, dunkelblaue Frucht, die oft in Marmeladen verwendet wird.")
+                }},
+                {"5", new List<(string, string)>{
+                    ("Auto", "Ein Fahrzeug mit vier Rädern, das von einem Motor betrieben wird."),
+                    ("Lkw", "Ein großes Fahrzeug, das für den Transport von Gütern verwendet wird."),
+                    ("Fahrrad", "Ein Fahrzeug, das von Menschen durch Treten der Pedale bewegt wird."),
+                    ("Bus", "Ein großes Fahrzeug, das mehrere Personen transportieren kann."),
+                    ("Zug", "Ein Fahrzeug, das auf Schienen fährt und Menschen oder Güter transportiert."),
+                    ("Flugzeug", "Ein Luftfahrzeug, das in den Himmel aufsteigt."),
+                    ("Boot", "Ein Wasserfahrzeug, das auf Seen oder Meeren fährt."),
+                    ("Traktor", "Ein Fahrzeug, das in der Landwirtschaft verwendet wird."),
+                    ("Motorrad", "Ein Fahrzeug mit zwei Rädern, das mit einem Motor betrieben wird."),
+                    ("Roller", "Ein kleines Fahrzeug, das mit zwei Rädern und einem Motor betrieben wird."),
+                    ("U-Bahn", "Ein unterirdisches Verkehrsmittel in Städten."),
+                    ("Taxi", "Ein Fahrzeug, das für die Personenbeförderung gegen Gebühr eingesetzt wird."),
+                    ("Hubschrauber", "Ein Luftfahrzeug, das senkrecht starten kann."),
+                    ("Schiff", "Ein großes Wasserfahrzeug, das große Entfernungen zurücklegt."),
+                    ("Eisenbahn", "Ein Transportsystem, das auf Schienen basiert.")
+                }}
+            };
+
+            // Вибір категорії
+            Console.WriteLine("Wähle eine Kategorie (1: Tiere, 2: Pflanzen, 3: Länder, 4: Früchte, 5: Fahrzeuge): ");
+            string kategorie = Console.ReadLine();
+
+            if (!kategorien.ContainsKey(kategorie))
+            {
+                Console.WriteLine("Ungültige Kategorie!");
+                return;
+            }
+
+            Random random = new Random();
+            List<(string, string)> kategorienList = kategorien[kategorie];
+            var (selectedWort, selectedHinweis) = kategorienList[random.Next(kategorienList.Count)];
+            wort = selectedWort;
+            hinweis = selectedHinweis;
+            wortAnzeigen = new string('_', wort.Length).ToCharArray();
+            errateneBuchstaben.Clear();
+            falscheVersuche = 0;
+            zeitAbgelaufen = false;
+
+            // Вибір складності
+            Console.WriteLine("Wähle eine Schwierigkeitsstufe (1: leicht, 2: mittel, 3: schwer): ");
+            string schwierigkeitsgrad = Console.ReadLine();
+
+            if (schwierigkeitsgrad == "1")
+            {
+                verbleibendeZeit = 600;  // 10 хвилин для легкого
+                hinweiseAktiviert = true;  // Підказки завжди включені для легкого рівня
+            }
+            else if (schwierigkeitsgrad == "2")
+            {
+                verbleibendeZeit = 180;  // 3 хвилини для середнього
+                Console.WriteLine("Möchtest du Hinweise aktivieren? (ja/nein)");
+                hinweiseAktiviert = Console.ReadLine().ToLower() == "ja";
+            }
+            else if (schwierigkeitsgrad == "3")
+            {
+                verbleibendeZeit = 60;   // 1 хвилина для важкого
+                hinweiseAktiviert = false;  // Немає підказок на важкому рівні
+            }
+            else
+            {
+                Console.WriteLine("Ungültiger Schwierigkeitsgrad!");
+                return;
+            }
+
+            timeLeft = verbleibendeZeit;
+            timer = new System.Threading.Timer(TimerTick, null, 0, 1000);
+
+            while (!zeitAbgelaufen && wortAnzeigen.Contains('_') && falscheVersuche < 6)
+            {
+                Console.Clear();
+                Console.WriteLine("Zeit verbleibend: " + timeLeft);
+                Console.WriteLine("Wort: " + new string(wortAnzeigen));
+                Console.WriteLine("Erratene Buchstaben: " + string.Join(", ", errateneBuchstaben));
+                Console.WriteLine("Fehlerhafte Versuche: " + falscheVersuche);
+
+                if (hinweiseAktiviert)
+                {
+                    Console.WriteLine("Hinweis: " + hinweis);
+                }
+
+                ShowHangman(falscheVersuche);
+                Console.WriteLine("Gib einen Buchstaben ein:");
+
+                string input = Console.ReadLine().ToLower();
+                if (input.Length == 1 && char.IsLetter(input[0]))
+                {
+                    char buchstabe = input[0];
+
+                    if (errateneBuchstaben.Contains(buchstabe))
+                    {
+                        Console.WriteLine("Du hast diesen Buchstaben bereits geraten.");
+                    }
+                    else
+                    {
+                        errateneBuchstaben.Add(buchstabe);
+
+                        if (wort.Contains(buchstabe))
+                        {
+                            Console.WriteLine("Richtige Antwort!");
+                            Console.Beep(1000, 200); // Високий тон для правильної відповіді
+
+                            for (int i = 0; i < wort.Length; i++)
+                            {
+                                if (wort[i] == buchstabe)
+                                {
+                                    wortAnzeigen[i] = buchstabe;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Falsche Antwort.");
+                            Console.Beep(400, 200); // Низький тон для неправильної відповіді
+                            falscheVersuche++;
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Bitte gib einen gültigen Buchstaben ein.");
+                }
+                Thread.Sleep(500); // Трохи затримка між спробами
+            }
+
+            if (falscheVersuche >= 6)
+            {
+                Console.WriteLine("Du hast verloren! Das Wort war: " + wort);
+                spieleVerloren++;
+            }
+            else if (wortAnzeigen.Contains('_'))
+            {
+                Console.WriteLine("Du hast gewonnen! Das Wort war: " + wort);
+                spieleGewonnen++;
+            }
+            else
+            {
+                Console.WriteLine("Du hast gewonnen! Das Wort war: " + wort);
+                spieleGewonnen++;
+            }
+
+            Console.WriteLine($"Spielergebnis: {spieleGewonnen} gewonnen, {spieleVerloren} verloren.");
+            timer.Dispose();  // Зупинка таймера після завершення гри
+        }
+
+        static void TimerTick(object state)
+        {
+            if (timeLeft > 0)
+            {
+                timeLeft--;
+            }
+            else
+            {
+                zeitAbgelaufen = true;
+                Console.WriteLine("Zeit abgelaufen! Du hast verloren.");
+                timer.Dispose();
+            }
+        }
+
+        static void ShowHangman(int falscheVersuche)
+        {
+            switch (falscheVersuche)
+            {
+                case 0:
+                    Console.WriteLine("  _____");
+                    Console.WriteLine("  |   |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("_____  ");
+                    break;
+                case 1:
+                    Console.WriteLine("  _____");
+                    Console.WriteLine("  |   |");
+                    Console.WriteLine("  O   |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("_____  ");
+                    break;
+                case 2:
+                    Console.WriteLine("  _____");
+                    Console.WriteLine("  |   |");
+                    Console.WriteLine("  O   |");
+                    Console.WriteLine("  |   |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("_____  ");
+                    break;
+                case 3:
+                    Console.WriteLine("  _____");
+                    Console.WriteLine("  |   |");
+                    Console.WriteLine("  O   |");
+                    Console.WriteLine(" /|   |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("_____  ");
+                    break;
+                case 4:
+                    Console.WriteLine("  _____");
+                    Console.WriteLine("  |   |");
+                    Console.WriteLine("  O   |");
+                    Console.WriteLine(" /|\\ |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("_____  ");
+                    break;
+                case 5:
+                    Console.WriteLine("  _____");
+                    Console.WriteLine("  |   |");
+                    Console.WriteLine("  O   |");
+                    Console.WriteLine(" /|\\ |");
+                    Console.WriteLine(" /    |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("_____  ");
+                    break;
+                case 6:
+                    Console.WriteLine("  _____");
+                    Console.WriteLine("  |   |");
+                    Console.WriteLine("  O   |");
+                    Console.WriteLine(" /|\\ |");
+                    Console.WriteLine(" / \\ |");
+                    Console.WriteLine("      |");
+                    Console.WriteLine("_____  ");
+                    break;
+            }
+        }
+    }
+}
