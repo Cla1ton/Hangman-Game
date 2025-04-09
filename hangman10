@@ -1,0 +1,352 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+
+namespace HangmanGame
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Spiel spiel = new Spiel();
+            spiel.StarteSpiel();
+        }
+    }
+
+    public class Spiel
+    {
+        private KategorieManager kategorieManager = new KategorieManager();
+        private Benutzeroberfläche ui = new Benutzeroberfläche();
+        private TimerManager timerManager = new TimerManager();
+        private int erlaubteFehler;
+        private Wort aktuellesWort;
+
+        public void StarteSpiel()
+        {
+            ui.Begrüßung();
+
+            Kategorie kategorie = kategorieManager.KategorieWählen();
+            aktuellesWort = kategorie.ZufälligesWort();
+            string schwierigkeitsgrad = ui.SchwierigkeitWählen();
+            SetzeFehlerLimitUndTimer(schwierigkeitsgrad);
+
+            if (ui.MöchtestDuHinweisNumerisch())
+                ui.ZeigeHinweis(aktuellesWort.Hinweis);
+
+            List<char> errateneBuchstaben = new List<char>();
+            List<char> verwendeteBuchstaben = new List<char>();
+            int fehler = 0;
+
+            while (fehler < erlaubteFehler && !aktuellesWort.IstVollständig(errateneBuchstaben) && !timerManager.Abgelaufen)
+            {
+                ui.ZeigeWort(aktuellesWort.Text, errateneBuchstaben);
+                ui.ZeigeVerwendeteBuchstaben(verwendeteBuchstaben);
+                ui.ZeigeVersuche(fehler, erlaubteFehler);
+                char buchstabe = ui.BuchstabeEingeben();
+
+                if (verwendeteBuchstaben.Contains(buchstabe))
+                {
+                    Console.WriteLine("⚠️ Du hast diesen Buchstaben bereits verwendet. Versuch es mit einem anderen.");
+                    continue;
+                }
+
+                verwendeteBuchstaben.Add(buchstabe);
+
+                if (aktuellesWort.Text.Contains(buchstabe))
+                {
+                    if (!errateneBuchstaben.Contains(buchstabe))
+                        errateneBuchstaben.Add(buchstabe);
+                }
+                else
+                {
+                    fehler++;
+                }
+
+                timerManager.AktualisiereTimer();
+            }
+
+            timerManager.StoppeTimer();
+            ui.ZeigeWort(aktuellesWort.Text, errateneBuchstaben);
+
+            if (aktuellesWort.IstVollständig(errateneBuchstaben))
+                ui.Gewonnen();
+            else if (timerManager.Abgelaufen)
+                ui.ZeitAbgelaufen();
+            else
+                ui.Verloren(aktuellesWort.Text);
+        }
+
+        private void SetzeFehlerLimitUndTimer(string schwierigkeitsgrad)
+        {
+            switch (schwierigkeitsgrad.ToLower())
+            {
+                case "leicht": erlaubteFehler = 8; timerManager.StarteTimer(aktuellesWort.Text.Length * 5); break;
+                case "mittel": erlaubteFehler = 6; timerManager.StarteTimer(180); break;
+                case "schwer": erlaubteFehler = 4; timerManager.StarteTimer(aktuellesWort.Text.Length * 3); break;
+                default: erlaubteFehler = 6; timerManager.StarteTimer(180); break;
+            }
+        }
+    }
+
+    public class Wort
+    {
+        public string Text { get; private set; }
+        public string Hinweis { get; private set; }
+
+        public Wort(string text, string hinweis)
+        {
+            Text = text.ToLower();
+            Hinweis = hinweis;
+        }
+
+        public bool IstVollständig(List<char> errateneBuchstaben)
+        {
+            return Text.All(c => errateneBuchstaben.Contains(c));
+        }
+    }
+
+    public class Kategorie
+    {
+        public string Name { get; private set; }
+        private List<Wort> Wörter;
+
+        public Kategorie(string name)
+        {
+            Name = name;
+            Wörter = new List<Wort>();
+        }
+
+        public void FügeWortHinzu(Wort wort)
+        {
+            Wörter.Add(wort);
+        }
+
+        public Wort ZufälligesWort()
+        {
+            Random rnd = new Random();
+            return Wörter[rnd.Next(Wörter.Count)];
+        }
+    }
+
+    public class KategorieManager
+    {
+        private List<Kategorie> kategorien;
+
+        public KategorieManager()
+        {
+            kategorien = new List<Kategorie>();
+            ErstelleKategorien();
+        }
+
+        private void ErstelleKategorien()
+        {
+            Kategorie tiere = new Kategorie("Tiere");
+            tiere.FügeWortHinzu(new Wort("Papagei", "Ein bunter Vogel, der sprechen kann."));
+            tiere.FügeWortHinzu(new Wort("Fledermaus", "Fliegendes Tier, aktiv in der Nacht."));
+            tiere.FügeWortHinzu(new Wort("Schmusetiger", "Kuschelt gerne, schnurrt."));
+            tiere.FügeWortHinzu(new Wort("Elefant", "Großes, graues Tier mit langen Stoßzähnen."));
+            tiere.FügeWortHinzu(new Wort("Tiger", "Gefährlicher, gestreifter Jäger."));
+
+            Kategorie pflanzen = new Kategorie("Pflanzen");
+            pflanzen.FügeWortHinzu(new Wort("Lavendel", "Duftet gut und hat lila Blüten."));
+            pflanzen.FügeWortHinzu(new Wort("Kaktus", "Stachelige Pflanze, wächst in der Wüste."));
+            pflanzen.FügeWortHinzu(new Wort("Tulpe", "Beliebte Frühlingsblume."));
+            pflanzen.FügeWortHinzu(new Wort("Rose", "Schöne Blume, oft in Gärten."));
+            pflanzen.FügeWortHinzu(new Wort("Lilien", "Schöne weiße Blumen mit großem Duft."));
+
+            Kategorie transport = new Kategorie("Transport");
+            transport.FügeWortHinzu(new Wort("Fahrrad", "Fortbewegungsmittel mit zwei Rädern."));
+            transport.FügeWortHinzu(new Wort("Auto", "Kraftfahrzeug für den Straßenverkehr."));
+            transport.FügeWortHinzu(new Wort("Zug", "Schienenfahrzeug für den Personenverkehr."));
+            transport.FügeWortHinzu(new Wort("Flugzeug", "Luftfahrzeug für den internationalen Transport."));
+            transport.FügeWortHinzu(new Wort("Schiff", "Großes Wasserfahrzeug für den Transport von Gütern."));
+
+            Kategorie land = new Kategorie("Land");
+            land.FügeWortHinzu(new Wort("Deutschland", "Land in Europa, bekannt für Bier und Oktoberfest."));
+            land.FügeWortHinzu(new Wort("Kanada", "Großes Land in Nordamerika."));
+            land.FügeWortHinzu(new Wort("Australien", "Land auf dem Kontinent Ozeanien, bekannt für das Great Barrier Reef."));
+            land.FügeWortHinzu(new Wort("Indien", "Land in Südasien, bekannt für Bollywood und Curry."));
+            land.FügeWortHinzu(new Wort("China", "Großes Land in Asien, bekannt für die Mauer und die Küche."));
+
+            Kategorie essen = new Kategorie("Essen");
+            essen.FügeWortHinzu(new Wort("Pizza", "Beliebtes italienisches Gericht mit Tomaten, Käse und anderen Zutaten."));
+            essen.FügeWortHinzu(new Wort("Sushi", "Japanisches Gericht mit rohem Fisch und Reis."));
+            essen.FügeWortHinzu(new Wort("Burger", "Sandwich mit Fleisch und verschiedenen Beilagen."));
+            essen.FügeWortHinzu(new Wort("Spaghetti", "Italienische Nudeln, die oft mit Tomatensauce serviert werden."));
+            essen.FügeWortHinzu(new Wort("Eiscreme", "Kalte Süßigkeit aus Milch und Zucker, oft mit verschiedenen Geschmacksrichtungen."));
+
+            kategorien.Add(tiere);
+            kategorien.Add(pflanzen);
+            kategorien.Add(transport);
+            kategorien.Add(land);
+            kategorien.Add(essen);
+        }
+
+        public Kategorie KategorieWählen()
+        {
+            Console.WriteLine("Wähle eine Kategorie:");
+            for (int i = 0; i < kategorien.Count; i++)
+            {
+                Console.WriteLine($"{i + 1}. {kategorien[i].Name}");
+            }
+
+            int auswahl = Benutzeroberfläche.ZahlEingeben(1, kategorien.Count);
+            return kategorien[auswahl - 1];
+        }
+    }
+
+    public class TimerManager
+    {
+        private int verbleibendeZeit;
+        private DateTime startZeit;
+        private bool läuft;
+
+        public bool Abgelaufen => verbleibendeZeit <= 0;
+
+        public void StarteTimer(int sekunden)
+        {
+            verbleibendeZeit = sekunden;
+            startZeit = DateTime.Now;
+            läuft = true;
+        }
+
+        public void AktualisiereTimer()
+        {
+            if (läuft)
+            {
+                TimeSpan vergangen = DateTime.Now - startZeit;
+                verbleibendeZeit = Math.Max(0, verbleibendeZeit - (int)vergangen.TotalSeconds);
+                startZeit = DateTime.Now;
+                Console.WriteLine($"\u23f3 Verbleibende Zeit: {verbleibendeZeit} Sekunden");
+            }
+        }
+
+        public void StoppeTimer()
+        {
+            läuft = false;
+        }
+    }
+
+    public class Benutzeroberfläche
+    {
+        public void Begrüßung()
+        {
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+            Console.WriteLine("🎮 Willkommen bei Hangman (Deutsch)!");
+            Console.WriteLine("----------------------------------\n");
+            ZeigeStartBild();
+        }
+
+        public void ZeigeStartBild()
+        {
+            Console.WriteLine("   _____  ");
+            Console.WriteLine("  /     \\ ");
+            Console.WriteLine(" |  O  O |");
+            Console.WriteLine(" |    ^  |");
+            Console.WriteLine(" |   '-'  |");
+            Console.WriteLine("  \\_____/ ");
+            Console.WriteLine("Das Spiel beginnt!");
+        }
+
+        public string SchwierigkeitWählen()
+        {
+            Console.WriteLine("Wähle den Schwierigkeitsgrad:");
+            Console.WriteLine("1. Leicht");
+            Console.WriteLine("2. Mittel");
+            Console.WriteLine("3. Schwer");
+            int auswahl = ZahlEingeben(1, 3);
+            return auswahl switch
+            {
+                1 => "leicht",
+                2 => "mittel",
+                3 => "schwer",
+                _ => "mittel"
+            };
+        }
+
+        public void ZeigeHinweis(string hinweis)
+        {
+            Console.WriteLine($"\n💡 Hinweis: {hinweis}");
+        }
+
+        public bool MöchtestDuHinweisNumerisch()
+        {
+            Console.WriteLine("Möchtest du einen Hinweis?");
+            Console.WriteLine("1. Ja\n2. Nein");
+            int wahl = ZahlEingeben(1, 2);
+            return wahl == 1;
+        }
+
+        public void ZeigeWort(string wort, List<char> errateneBuchstaben)
+        {
+            Console.Write("Wort: ");
+            foreach (char c in wort)
+            {
+                Console.Write(errateneBuchstaben.Contains(c) ? $"{c} " : "_ ");
+            }
+            Console.WriteLine("\n");
+        }
+
+        public void ZeigeVerwendeteBuchstaben(List<char> buchstaben)
+        {
+            Console.WriteLine("Benutzte Buchstaben: " + string.Join(", ", buchstaben));
+        }
+
+        public void ZeigeVersuche(int fehler, int limit)
+        {
+            string[] hangman = new string[]
+            {
+                "   _____  \n  |     | \n  |       \n  |       \n  |       \n  |       \n__|__\n",  // 0 Fehler
+                "   _____  \n  |     | \n  |     O \n  |       \n  |       \n  |       \n__|__\n",  // 1 Fehler
+                "   _____  \n  |     | \n  |     O \n  |     | \n  |       \n  |       \n__|__\n",  // 2 Fehler
+                "   _____  \n  |     | \n  |     O \n  |    /| \n  |       \n  |       \n__|__\n",  // 3 Fehler
+                "   _____  \n  |     | \n  |     O \n  |    /|\\ \n  |       \n  |       \n__|__\n",  // 4 Fehler
+                "   _____  \n  |     | \n  |     O \n  |    /|\\ \n  |    /  \n  |       \n__|__\n",  // 5 Fehler
+                "   _____  \n  |     | \n  |     O \n  |    /|\\ \n  |    / \\ \n  |       \n__|__\n",  // 6 Fehler
+            };
+
+            int index = Math.Min(fehler, hangman.Length - 1);
+            Console.WriteLine(hangman[index]);
+            Console.WriteLine($"❌ Fehler: {fehler} von {limit}\n");
+        }
+
+        public char BuchstabeEingeben()
+        {
+            Console.Write("🔤 Gib einen Buchstaben ein: ");
+            string eingabe;
+            while (true)
+            {
+                eingabe = Console.ReadLine().ToLower();
+                if (!string.IsNullOrWhiteSpace(eingabe) && eingabe.Length == 1 && char.IsLetter(eingabe[0]))
+                    return eingabe[0];
+                Console.Write("Bitte gib **nur einen Buchstaben** ein: ");
+            }
+        }
+
+        public void Gewonnen()
+        {
+            Console.WriteLine("🎉 Glückwunsch! Du hast das Wort erraten!");
+        }
+
+        public void Verloren(string korrektesWort)
+        {
+            Console.WriteLine($"😢 Leider verloren. Das richtige Wort war: {korrektesWort}");
+        }
+
+        public void ZeitAbgelaufen()
+        {
+            Console.WriteLine("⏰ Die Zeit ist abgelaufen! Du hast verloren.");
+        }
+
+        public static int ZahlEingeben(int min, int max)
+        {
+            int zahl;
+            while (!int.TryParse(Console.ReadLine(), out zahl) || zahl < min || zahl > max)
+            {
+                Console.Write($"Bitte gib eine Zahl zwischen {min} und {max} ein: ");
+            }
+            return zahl;
+        }
+    }
+}
